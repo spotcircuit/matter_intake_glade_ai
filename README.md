@@ -4,17 +4,54 @@ AI-assisted client intake for a small law firm. A prospective client (or an inta
 
 **The AI is an assistant, not a decider.** Every matter is reviewed by a human before any next step.
 
-## The problem
+## Why this exists, and what I'd defend in a product review
 
-Small law firms field a steady trickle of intake emails / phone notes / web-form descriptions. Each one needs to be classified, checked for conflicts of interest, prioritized, and either picked up or referred out. Doing that by hand is slow, inconsistent, and the conflict-check step is the kind of thing humans miss when they're tired.
+### Why intake triage, and why now
 
-The app solves three concrete pain points:
+Small law firms drown in unqualified leads. A two-attorney firm doing personal injury and employment work might get 40–80 inbound intakes a week — emails from their website form, voicemails transcribed, paralegal-typed notes from phone calls. Maybe a quarter of those are actionable. The other three quarters are out-of-practice-area, jurisdictional non-fits, opposing-party fishing, repeat submissions, or descriptions so thin you can't tell yet. Today that triage happens in someone's head and inbox: an associate or a paralegal reads each one, makes a judgment call, types a referral letter or forwards to the right attorney, and tries to remember to run the conflict check before any of that happens.
 
-1. **Free text → structured record**, in one pass — matter type, jurisdiction, key dates, monetary amounts, urgency. The attorney scans 10 seconds of structured fields instead of 200 words of prose.
-2. **Conflict check on every intake**, automatically — name-match against existing clients and against opposing parties from past matters. False positives are fine; false negatives (silently missed conflicts) are not.
-3. **A queue, not an inbox** — matters sorted by urgency, attorney accepts or declines with one click and an optional note, every transition logged to an audit trail.
+Two failure modes drive real malpractice exposure: **missed conflicts** and **missed deadlines**. Conflict checks are manual because most firms' "system" is "we've been here long enough to remember our clients." That works until it doesn't — a junior associate doesn't know that Acme Industries was a client three years ago, accepts a case against them, and now the firm has a disclosure obligation and a likely disqualification. Deadline-missed is worse: a personal-injury intake comes in two months before the statute of limitations runs, lands in someone's inbox, doesn't get triaged for ten days, and now the firm is in a panicked sprint instead of a normal engagement.
 
-The AI never auto-decides. Even on a perfectly classified high-confidence intake, the attorney still has to click Accept.
+This app doesn't solve either failure mode entirely. It moves them from "depends on whether someone happened to remember" to "there's a structured queue with a flag on it." That's a meaningful upgrade even if the AI gets the matter type wrong half the time.
+
+### Why AI suggests, and a human confirms
+
+Full automation here would be malpractice. Three reasons it can't be the AI's call:
+
+1. **Conflict checks aren't a similarity-matching problem; they're a duty-of-loyalty problem.** A name match might be a 100% conflict, a coincidental homonym, or a former client whose representation ended in a way that doesn't preclude this matter. The model can flag the match. Only a person with the firm's history and ethics rules in mind decides what the flag means.
+
+2. **The classification taxonomy is the firm's, not the model's.** Whether something is "Contract Dispute" vs "Employment" depends on what the firm intends to do with it — sometimes a wage claim is better triaged as a contract case if the firm's employment shop is full. The AI doesn't know that, and shouldn't pretend to. It classifies what it sees; the attorney redirects when it doesn't fit the firm's current capacity.
+
+3. **The accept/decline decision has consequences the AI cannot account for**: client capacity, fee structure, conflicts the firm hasn't surfaced yet, referral relationships, the attorney's actual willingness to take this client based on a 30-second read of the description. The model has none of that context. Making the AI the decider would force every one of those judgments into a prompt — that's how systems start gaslighting their users.
+
+So the architecture is split deliberately: the AI fills in the structured fields and the conflict flags. The attorney's accept/decline writes a state transition to the audit log. The two are separate columns in the schema and separate actions in the UI, never collapsed. Every matter-detail page labels the AI fields "advisory only" above the decision panel.
+
+A consequence of this split: the system has to be useful **even when the AI fails**. So the matter row is created before the AI call, the AI's failure flips the matter to `needs_manual_review` instead of refusing to save, and the conflict check runs regardless of the AI's status. The attorney can always do their job; the AI is the accelerant, not the gate.
+
+### What I cut, and why
+
+The brief said the AI assistant is what's being graded, not a full case-management system. Things I deliberately cut, and what would justify reversing each cut:
+
+- **Document upload + OCR.** A real intake includes a photo of a contract, a scan of an EEOC charge, a PDF of a complaint. Building that means storage (S3 + signed URLs), virus scanning (ClamAV or a vendor), OCR (Textract / Vision API), and a redaction pass before anything goes to the model. Each one is its own engineering problem. Including it half-built would have crowded out the triage logic that's actually being evaluated. Add it back when a customer has been live for a quarter and can tell us what document types matter most.
+- **Multi-tenant orgs and real auth.** One firm, no login. A real deploy needs orgs → users → matters with row-level access, role-based UI (intake coordinator vs attorney vs admin), and SSO. The `actor` column on the audit log already exists; adding the rest is mechanical. Cut for the demo because it would have obscured the triage code with auth middleware noise that's the same as any other SaaS.
+- **Billing / time tracking / engagement letter / e-signature.** Accepting a matter in a real firm produces an engagement letter, a billing setup, and possibly a trust account deposit. That's a different system that reads from this one. Including it would have meant either a fake billing UI (useless) or a real integration with a clio-style provider (out of scope).
+- **Calendar / notifications.** A real intake creates an obligation to follow up. Email notifications + a calendar invite for the initial consult are obvious extensions. Skipped because the dashboard *is* the inbox in this design — the attorney's workflow is to open the dashboard and clear the queue, not get pinged.
+- **LLM-as-judge on classification quality.** Would catch quality regressions as the model evolves. Worth adding once there's a labeled set of "the attorney agreed / disagreed with the AI's classification" data to grade against. Today there isn't, so the eval would just be the model grading itself.
+- **Scheduled reminders ("this matter has been in triage for >24h").** Easy to add as a cron task that scans `matters.status = 'intake_review' AND created_at < now() - interval '24 hours'`. Skipped to keep the demo runtime to one process; would be the first thing I'd add post-MVP.
+
+What I **didn't** cut and would defend even though it would have been faster to skip:
+
+- The audit log. Every state transition writes a row. This is the table the firm's malpractice carrier will ask about in a deposition, and it's the table I'd want if I were the attorney trying to reconstruct what happened. Building it after the fact is the kind of work that always slips.
+- The `needs_manual_review` status as a distinct state, not a subset of intake_review. The dashboard treats it differently, the audit log records the AI failure as a distinct action, and the UI tells the attorney explicitly that the AI couldn't structure the intake. That separation is what keeps "the AI suggests" honest — when it can't suggest, the system says so out loud.
+- The duplicate-submission window. A 5-minute window catches refresh / double-click without dropping genuine re-submissions. It cost ~20 lines of code and prevents the most annoying class of demo bug.
+
+## The problem (concise)
+
+Small law firms field 40–80 inbound intakes a week. Most aren't actionable, conflict checks are manual and error-prone, and time-sensitive matters get lost in inboxes. This app gives the firm a structured queue with AI-suggested classification and automatic conflict flags — the attorney accepts or declines every matter with a single click and an audit-logged note. Three concrete wins:
+
+1. **Free text → structured record** in one pass — matter type, jurisdiction, key dates, monetary amounts, urgency. The attorney scans structured fields in 10 seconds instead of 200 words of prose.
+2. **Conflict check on every intake**, automatically — name-match against existing clients and against opposing parties from past matters. False positives are cheap (one click); false negatives are malpractice exposure.
+3. **A queue, not an inbox** — sorted by urgency, attorney accepts or declines, every transition logged.
 
 ## Architecture
 
