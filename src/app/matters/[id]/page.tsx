@@ -8,6 +8,7 @@ import {
 import { UrgencyBadge } from "@/components/UrgencyBadge";
 import { StatusBadge } from "@/components/StatusBadge";
 import { DecisionPanel } from "./decision-panel";
+import { ConflictPanel } from "./conflict-panel";
 import type { MatterStatus, MatterType, Urgency } from "@/lib/domain/types";
 
 export const dynamic = "force-dynamic";
@@ -65,25 +66,7 @@ export default async function MatterDetailPage({ params }: { params: Params }) {
         </section>
       )}
 
-      {matter.conflicts.length > 0 ? (
-        <section className="rounded-2xl border border-rose-200 bg-rose-50 p-5 text-sm text-rose-900">
-          <h2 className="text-sm font-semibold uppercase tracking-wide text-rose-900">
-            Conflict check — {matter.conflicts.length} match
-            {matter.conflicts.length === 1 ? "" : "es"} to verify
-          </h2>
-          <ul className="mt-2 space-y-2 text-sm">
-            {matter.conflicts.map((c, i) => (
-              <li key={i}>
-                <span className="font-medium">{c.matchedParty}:</span> {c.note}
-              </li>
-            ))}
-          </ul>
-          <p className="mt-3 border-t border-rose-200/60 pt-2 text-xs text-rose-800/80">
-            Flags are surfaced for human review only. The AI doesn&apos;t know
-            whether prior representation precludes this matter — you do.
-          </p>
-        </section>
-      ) : null}
+      <ConflictPanel matterId={matter.id} flags={matter.conflicts} />
 
       {/* AI suggestion — visually subordinate, clearly labeled as suggestion */}
       <section className="space-y-3 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
@@ -189,6 +172,7 @@ const ACTION_LABEL: Record<string, string> = {
   ai_triage_applied: "AI structured the intake",
   ai_failure_flagged_for_manual_review: "AI failed — flagged for manual review",
   conflict_flag_raised: "Conflict flag raised",
+  conflict_flag_dismissed: "Conflict flag dismissed by attorney",
   accepted: "Accepted by attorney",
   declined: "Declined by attorney",
 };
@@ -203,9 +187,11 @@ function AuditRow({ entry }: { entry: AuditEntry }) {
         : entry.action === "conflict_flag_raised" ||
             entry.action === "ai_failure_flagged_for_manual_review"
           ? "bg-rose-500"
-          : entry.action === "ai_triage_applied"
-            ? "bg-indigo-500"
-            : "bg-slate-300";
+          : entry.action === "conflict_flag_dismissed"
+            ? "bg-amber-500"
+            : entry.action === "ai_triage_applied"
+              ? "bg-indigo-500"
+              : "bg-slate-300";
 
   return (
     <li className="flex gap-3">

@@ -29,7 +29,7 @@ import type { MatterStatus, Urgency } from "./types";
 export type MatterSummary = Matter & {
   client: Pick<Client, "id" | "name" | "email">;
   facts: Pick<ExtractedFact, "key" | "value">[];
-  conflicts: Pick<ConflictFlag, "matchedParty" | "note">[];
+  conflicts: Pick<ConflictFlag, "id" | "matchedParty" | "note">[];
 };
 
 const URGENCY_RANK: Record<Urgency, number> = { High: 3, Medium: 2, Low: 1 };
@@ -67,6 +67,7 @@ export async function listMatters(opts?: {
       .where(inArray(extractedFacts.matterId, matterIds)),
     db()
       .select({
+        id: conflictFlags.id,
         matterId: conflictFlags.matterId,
         matchedParty: conflictFlags.matchedParty,
         note: conflictFlags.note,
@@ -90,6 +91,7 @@ export async function listMatters(opts?: {
       value: f.value,
     })),
     conflicts: (conflictsByMatter.get(r.matters.id) ?? []).map((c) => ({
+      id: c.id,
       matchedParty: c.matchedParty,
       note: c.note,
     })),
@@ -149,6 +151,7 @@ export async function getMatterById(
       .where(eq(extractedFacts.matterId, id)),
     db()
       .select({
+        id: conflictFlags.id,
         matterId: conflictFlags.matterId,
         matchedParty: conflictFlags.matchedParty,
         note: conflictFlags.note,
@@ -166,6 +169,7 @@ export async function getMatterById(
     },
     facts: facts.map((f) => ({ key: f.key, value: f.value })),
     conflicts: flags.map((c) => ({
+      id: c.id,
       matchedParty: c.matchedParty,
       note: c.note,
     })),
