@@ -27,7 +27,7 @@
  * to be permissive.
  */
 
-import { eq, or } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import type { ConflictMatch } from "./types";
 import { clients, matters } from "@/lib/db/schema";
 import { db } from "@/lib/db/client";
@@ -219,7 +219,7 @@ export async function findRecentDuplicate(opts: {
     })
     .from(matters)
     .innerJoin(clients, eq(matters.clientId, clients.id))
-    .where(or(eq(clients.email, opts.email)));
+    .where(eq(clients.email, opts.email));
 
   for (const row of rows) {
     if (

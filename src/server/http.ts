@@ -42,9 +42,29 @@ export function mapZodError(err: ZodError, code = "invalid_request"): NextRespon
 /**
  * Lift a generic thrown error into a 500. Logs to the server console
  * with a stable prefix so production logs are greppable.
+ *
+ * For Drizzle / DB errors specifically, the useful information lives
+ * in `err.cause` (the underlying Postgres / Neon driver error). We
+ * surface that in the response body too — the alternative is "Failed
+ * query: ..." with the SQL but no error code, which is useless for
+ * debugging.
  */
 export function mapUnhandled(scope: string, err: unknown): NextResponse {
   const message = err instanceof Error ? err.message : String(err);
+  const cause = err instanceof Error ? extractCause(err) : null;
   console.error(`[${scope}] unhandled:`, err);
-  return jsonError(500, "server_error", `Server error in ${scope}: ${message}`);
+  if (cause) console.error(`[${scope}] cause:`, cause);
+  return jsonError(500, "server_error", `Server error in ${scope}: ${message}`, {
+    cause,
+  });
+}
+
+function extractCause(err: Error): string | null {
+  const cause = (err as { cause?: unknown }).cause;
+  if (!cause) return null;
+  if (cause instanceof Error) {
+    const code = (cause as { code?: string }).code;
+    return code ? `${code}: ${cause.message}` : cause.message;
+  }
+  return String(cause);
 }
