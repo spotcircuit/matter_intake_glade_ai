@@ -43,12 +43,10 @@ export const IntakeInputSchema = z.object({
     .trim()
     .email("Valid email is required")
     .max(200),
-  opposingParty: z
-    .string()
-    .trim()
-    .max(200)
-    .optional()
-    .or(z.literal("").transform(() => undefined)),
+  opposingParty: z.preprocess(
+    (v) => (typeof v === "string" && v.trim() === "" ? undefined : v),
+    z.string().trim().max(200).optional(),
+  ),
   description: z
     .string()
     .trim()
