@@ -1,36 +1,55 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Matter Intake & Triage
 
-## Getting Started
+AI-assisted client intake for a small law firm. A prospective client (or intake coordinator) describes a legal situation in plain language; the app classifies the matter, extracts structured facts, flags urgency, runs a conflict check against existing clients, and produces a triaged record for an attorney to accept or decline.
 
-First, run the development server:
+**The AI is an assistant, not a decider.** Every matter gets reviewed by a human.
+
+> 🚧 Work in progress — currently at **M1 (scaffold)**. M2–M6 land in subsequent commits.
+
+## Run it locally
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+cp .env.example .env.local
+# Fill in DATABASE_URL (Neon) and ANTHROPIC_API_KEY
+npm install
+npm run db:generate    # generate SQL migrations from drizzle schema (after M2)
+npm run db:migrate     # apply migrations to Neon
+npm run db:seed        # load ~8 sample matters (after M2)
+npm run dev            # http://localhost:3000
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## Stack
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+- **Next.js 16** (App Router) + TypeScript + React 19
+- **Tailwind CSS v4**
+- **Neon** (serverless Postgres) via `@neondatabase/serverless`
+- **Drizzle ORM** — schema, migrations, typed queries
+- **Zod** — request validation + AI structured-output validation
+- **Anthropic SDK** — `claude-sonnet-4-6` via tool use for classification + extraction
+- **Vitest** — unit tests on triage + conflict-check logic
+- **Vercel** — deploy target
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## Out of scope (deliberate)
 
-## Learn More
+- Billing / time tracking
+- Document upload / OCR
+- Multi-tenant orgs (single seeded firm only)
+- Real e-signature
+- Calendar integration
+- Production auth (no auth at all in this demo; see "Auth" below)
 
-To learn more about Next.js, take a look at the following resources:
+These are real-product needs but each is its own design problem. Focus here is the intake → triage → accept/decline loop done well.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Auth
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+**The demo has no authentication.** Anyone with the URL can submit an intake and any attorney can accept/decline from the dashboard. This is deliberate for a take-home demo and is the obvious production next step.
 
-## Deploy on Vercel
+A real deployment would need: multi-tenant firms (org → users → matters), role-based access (intake coordinator vs. attorney vs. admin), audit trails per actor, and SSO. Each of those is straightforward but each adds enough surface area to obscure the actual triage logic that's being evaluated.
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+## More to come
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+- M2: Drizzle schema + Neon connection + seed data
+- M3: Domain services (AI classify+extract, conflict check, triage)
+- M4: Route handlers (`POST /api/matters`, list, `PATCH` for accept/decline)
+- M5: UI (intake form, triage dashboard, matter review)
+- M6: Tests, README expansion, polish
