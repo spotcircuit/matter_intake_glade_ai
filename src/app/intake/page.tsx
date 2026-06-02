@@ -1,23 +1,23 @@
-import { IntakeForm } from "./intake-form";
 import Link from "next/link";
+import { IntakeForm } from "./intake-form";
 
 export default function IntakePage() {
   return (
-    <main className="mx-auto flex min-h-svh w-full max-w-2xl flex-col gap-6 px-6 py-10">
-      <header className="space-y-2">
+    <main className="mx-auto flex min-h-svh w-full max-w-2xl flex-col gap-7 px-6 py-12">
+      <header className="space-y-3">
         <Link
           href="/"
-          className="text-xs font-medium uppercase tracking-wide text-slate-500 hover:text-slate-700"
+          className="text-[11px] font-medium uppercase tracking-[0.18em] text-slate-500 hover:text-slate-700"
         >
           ← Matter Intake &amp; Triage
         </Link>
-        <h1 className="text-2xl font-semibold tracking-tight text-slate-900">
-          New client intake
+        <h1 className="text-balance text-3xl font-semibold leading-tight tracking-tight text-slate-900">
+          Tell us what&apos;s going on.
         </h1>
-        <p className="text-sm text-slate-600">
-          Describe the legal situation in plain language. The AI classifies the
-          matter and pulls structured facts; an attorney reviews every intake
-          before any next step.
+        <p className="max-w-xl text-slate-600">
+          Plain language is fine. Mention dates, places, amounts, and other
+          parties if you remember them. An attorney reads every intake — the AI
+          just helps us organize what you send.
         </p>
       </header>
       <IntakeForm />

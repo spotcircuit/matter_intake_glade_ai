@@ -10,12 +10,14 @@
  * know the ordering rules.
  */
 
-import { desc, eq, inArray, sql } from "drizzle-orm";
+import { asc, desc, eq, inArray, sql } from "drizzle-orm";
 import {
+  auditLog,
   clients,
   conflictFlags,
   extractedFacts,
   matters,
+  type AuditLogEntry,
   type Client,
   type ConflictFlag,
   type ExtractedFact,
@@ -103,6 +105,26 @@ export async function listMatters(opts?: {
   });
 
   return summaries;
+}
+
+export type AuditEntry = Pick<
+  AuditLogEntry,
+  "id" | "action" | "actor" | "note" | "createdAt"
+>;
+
+/** Load the full audit trail for a matter, oldest first. */
+export async function listAuditForMatter(matterId: string): Promise<AuditEntry[]> {
+  return db()
+    .select({
+      id: auditLog.id,
+      action: auditLog.action,
+      actor: auditLog.actor,
+      note: auditLog.note,
+      createdAt: auditLog.createdAt,
+    })
+    .from(auditLog)
+    .where(eq(auditLog.matterId, matterId))
+    .orderBy(asc(auditLog.createdAt));
 }
 
 export async function getMatterById(
