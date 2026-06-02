@@ -75,10 +75,19 @@ function partiesFromIntake(p: {
  * Returns an array of `ConflictMatch` records — one per surfaced flag.
  * Empty array means no conflicts found. Caller writes each to
  * `conflict_flags`.
+ *
+ * `excludeClientId` + `excludeMatterId` let the caller pass the IDs of
+ * the just-created/upserted rows so we don't match the new intake
+ * against itself. Without these, every fresh intake produces a
+ * self-flag ("Jordan Park matches existing Jordan Park"), which is
+ * noise. With them, the conflict check compares the new intake against
+ * everyone EXCEPT this same intake.
  */
 export async function runConflictCheck(intake: {
   clientName: string;
   opposingParty?: string | null;
+  excludeClientId?: string;
+  excludeMatterId?: string;
 }): Promise<ConflictMatch[]> {
   const parties = partiesFromIntake(intake);
   const normalizedTargets = parties.map((p) => ({
@@ -90,15 +99,25 @@ export async function runConflictCheck(intake: {
   // existing matters. With a small firm (hundreds of matters) this is
   // fine; if we ever needed to scale, this becomes a paginated cursor
   // or a Postgres full-text search.
-  const [existingClients, existingMatters] = await Promise.all([
+  const [allClients, allMatters] = await Promise.all([
     db().select({ id: clients.id, name: clients.name }).from(clients),
     db()
       .select({
+        id: matters.id,
         opposingParty: matters.opposingParty,
         clientId: matters.clientId,
       })
       .from(matters),
   ]);
+
+  // Drop the just-created intake's own rows so we don't match against
+  // ourselves. See the doc comment on this function's signature.
+  const existingClients = intake.excludeClientId
+    ? allClients.filter((c) => c.id !== intake.excludeClientId)
+    : allClients;
+  const existingMatters = intake.excludeMatterId
+    ? allMatters.filter((m) => m.id !== intake.excludeMatterId)
+    : allMatters;
 
   const flags: ConflictMatch[] = [];
 

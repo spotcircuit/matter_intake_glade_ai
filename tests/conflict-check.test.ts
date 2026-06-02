@@ -74,4 +74,14 @@ describe("matchKind", () => {
     const b = normalizeName("Acme Industries");
     expect(matchKind(a, b)).toBe("exact");
   });
+
+  // The fix for the self-match bug — pinned here so the regression
+  // can't slip back in via a refactor. The DB-touching half of
+  // runConflictCheck is exercised by manual smoke; the pure rule
+  // (these inputs match, those inputs don't) lives here.
+  it("identical name strings normalize and match — caller must exclude self by id", () => {
+    expect(matchKind(normalizeName("Jordan Park"), normalizeName("Jordan Park"))).toBe(
+      "exact",
+    );
+  });
 });

@@ -110,7 +110,7 @@ export async function submitIntake(input: IntakeInput): Promise<IntakeOutcome> {
       });
     // Still run the conflict check — it's pure DB and useful regardless
     // of the AI's status.
-    const flags = await persistConflictFlags(matterRow.id, input);
+    const flags = await persistConflictFlags(matterRow.id, clientId, input);
     return {
       ok: true,
       kind: "created",
@@ -157,7 +157,7 @@ export async function submitIntake(input: IntakeInput): Promise<IntakeOutcome> {
     });
 
   // 6. Conflict check
-  const flags = await persistConflictFlags(matterRow.id, input);
+  const flags = await persistConflictFlags(matterRow.id, clientId, input);
 
   return {
     ok: true,
@@ -191,11 +191,14 @@ async function upsertClient(name: string, email: string): Promise<string> {
 
 async function persistConflictFlags(
   matterId: string,
+  clientId: string,
   input: IntakeInput,
 ): Promise<number> {
   const flags = await runConflictCheck({
     clientName: input.clientName,
     opposingParty: input.opposingParty ?? null,
+    excludeClientId: clientId,
+    excludeMatterId: matterId,
   });
   if (flags.length === 0) return 0;
 
